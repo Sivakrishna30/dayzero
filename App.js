@@ -8,6 +8,7 @@ export default function App() {
   const [page, setPage] = useState('home');
   const [resourceTab, setResourceTab] = useState('planner');
   const [selectedExam, setSelectedExam] = useState(null); 
+  const [selectedLanguage, setSelectedLanguage] = useState('tamil');
   const [prepLevel, setPrepLevel] = useState(null); 
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [completedTopics, setCompletedTopics] = useState([]);
@@ -134,11 +135,32 @@ export default function App() {
   const getActiveSyllabus = () => {
     if (!selectedExam) return [];
     const data = syllabusData[selectedExam];
-    if (Array.isArray(data)) return data; 
-    return data[subTab] || []; 
+    let units = Array.isArray(data) ? data : (data[subTab] || []);
+    
+    // Group 2 Prelims language filtering
+    if (selectedExam === 'group2' && subTab === 'prelims') {
+      return units.filter(unit => {
+        if (unit.part === 'Part C') {
+          return unit.lang === selectedLanguage;
+        }
+        return true;
+      });
+    }
+    
+    return units;
   };
 
   const activeSyllabus = getActiveSyllabus();
+
+  const toggleUnit = (unitTitle, unitTopics) => {
+    const allCompleted = unitTopics.every(t => completedTopics.includes(t));
+    if (allCompleted) {
+      setCompletedTopics(completedTopics.filter(t => !unitTopics.includes(t)));
+    } else {
+      const newTopics = [...new Set([...completedTopics, ...unitTopics])];
+      setCompletedTopics(newTopics);
+    }
+  };
 
   const parseWeightage = (w) => {
     if (!w) return 0;
@@ -162,6 +184,43 @@ export default function App() {
   const currentProgress = totalTopics > 0 
     ? Math.round((completedTopics.length / totalTopics) * 100) 
     : 0;
+
+  const [strategyView, setStrategyView] = useState('ordered'); // 'ordered' or 'attack'
+
+  const getTargetMarks = () => {
+    if (selectedExam === 'group1') return subTab === 'prelims' ? 220 : 550;
+    if (selectedExam === 'group2') return subTab === 'prelims' ? 175 : 190;
+    if (selectedExam === 'group4') return 185;
+    return 0;
+  };
+
+  const calculateCurrentScore = () => {
+    const syllabus = getActiveSyllabus();
+    let score = 0;
+    syllabus.forEach(unit => {
+      const unitTopics = unit.topics;
+      const completedInUnit = unitTopics.filter(t => completedTopics.includes(t)).length;
+      if (completedInUnit > 0) {
+        const weightString = unit.weightage || unit.marks || '0';
+        const weightMatch = weightString.match(/(\d+(\.\d+)?)/);
+        const unitWeight = weightMatch ? parseFloat(weightMatch[0]) : 0;
+        score += (completedInUnit / unitTopics.length) * unitWeight;
+      }
+    });
+    return Math.round(score * 10) / 10;
+  };
+  const targetMarks = getTargetMarks();
+  const currentScore = calculateCurrentScore();
+  const markGap = Math.max(0, targetMarks - currentScore);
+
+  const getTodayTopic = () => {
+    const syllabus = getActiveSyllabus();
+    for (const unit of syllabus) {
+      const pending = unit.topics.find(t => !completedTopics.includes(t));
+      if (pending) return pending;
+    }
+    return "Syllabus Completed!";
+  };
 
   const activeInfo = activeExamInfo;
 
@@ -343,45 +402,56 @@ export default function App() {
             <View style={styles.topBarSpacer} />
           </View>
           
-          <Text style={styles.onboardingTitleSmall}>What have you completed?</Text>
-          <Text style={styles.onboardingTextSmall}>Select the topics you are 100% sure of.</Text>
-          
-          <ScrollView style={styles.checklistScroll} showsVerticalScrollIndicator={false}>
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.onboardingEyebrow}>PHASE 1: THE SIEGE</Text>
+            <Text style={styles.onboardingTitleSmall}>What have you completed?</Text>
+            <Text style={styles.onboardingTextSmall}>Select the units/topics you are 100% sure of.</Text>
+          </View>
+
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             {(Array.isArray(syllabusData[selectedExam]) 
                 ? syllabusData[selectedExam] 
                 : [...(syllabusData[selectedExam]?.prelims || []), ...(syllabusData[selectedExam]?.mains || [])]
-             ).map((unit) => (
-              <View key={unit.id} style={styles.checklistCard}>
-                <Text style={styles.checklistUnitTitle}>{unit.title}</Text>
-                {unit.topics.map((topic, idx) => (
-                  <Pressable 
-                    key={idx} 
-                    style={styles.checkItem}
-                    onPress={() => toggleTopic(topic)}
-                  >
-                    <View style={[styles.checkbox, completedTopics.includes(topic) && styles.checkboxChecked]} />
-                    <Text style={[styles.checkText, completedTopics.includes(topic) && styles.checkTextDone]}>{topic}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ))}
+             ).map((unit) => {
+              const isUnitFullyCompleted = unit.topics.every(t => completedTopics.includes(t));
+              return (
+                <View key={unit.id} style={styles.setupUnit}>
+                  <View style={styles.setupTopicsPanel}>
+                    <Pressable onPress={() => toggleUnit(unit.title, unit.topics)} style={({pressed}) => [styles.setupUnitHeader, pressed && styles.buttonPressed]}>
+                      <View style={[styles.setupCheckbox, isUnitFullyCompleted && styles.setupCheckboxActive]}>
+                        {isUnitFullyCompleted && <View style={styles.setupCheckboxInner} />}
+                      </View>
+                      <Text style={styles.setupUnitTitle}>{unit.title}</Text>
+                    </Pressable>
+                    <View style={styles.textSeparator} />
+                    {unit.topics.map((topic) => (
+                      <Pressable key={topic} onPress={() => toggleTopic(topic)} style={({pressed}) => [styles.setupTopicRow, pressed && styles.buttonPressed]}>
+                        <View style={[styles.setupCheckboxMini, completedTopics.includes(topic) && styles.setupCheckboxActive]}>
+                          {completedTopics.includes(topic) && <View style={styles.setupCheckboxInnerMini} />}
+                        </View>
+                        <Text style={[styles.setupTopicText, completedTopics.includes(topic) && styles.setupTopicTextCompleted]}>{topic}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+            <View style={{ height: 100 }} />
           </ScrollView>
-          
-          <Pressable
-            onPress={() => {
-              setIsIntermediateSetupDone(true);
-              setPage('home');
-            }}
-            style={({ pressed }) => [
-              styles.finishButton,
-              pressed && styles.buttonPressed,
-            ]}
-          >
-            <Text style={styles.finishButtonText}>Save & Start Journey</Text>
-          </Pressable>
+          <View style={styles.setupFooterFixed}>
+            <Pressable 
+              onPress={() => {
+                setIsIntermediateSetupDone(true);
+                setPage('home');
+              }} 
+              style={({pressed}) => [styles.setupBtn, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.setupBtnText}>Save & Start Journey</Text>
+            </Pressable>
+          </View>
         </View>
       ) : page === 'home' ? (
-        <View style={styles.page}>
+        <ScrollView style={styles.page} showsVerticalScrollIndicator={false}>
           <View style={styles.topBar}>
             <Pressable
               onPress={() => setShowSwitchModal(true)}
@@ -402,7 +472,6 @@ export default function App() {
                 pressed && styles.buttonPressed,
               ]}
             >
-              <View style={styles.guestDot} />
               <Text style={styles.guestBadgeText}>Guest mode</Text>
             </Pressable>
           </View>
@@ -424,23 +493,37 @@ export default function App() {
                 <Text style={styles.countdownValue}>{daysToExam}</Text>
                 <Text style={styles.countdownLabel}>DAYS TO GO</Text>
               </View>
-
-              <Pressable onPress={() => setPage('progress')} style={styles.homeProgressBox}>
-                <View style={styles.homeProgressHeader}>
-                  <Text style={styles.homeProgressTitle}>Syllabus Progress</Text>
-                  <Text style={styles.homeProgressValue}>{currentProgress}%</Text>
-                </View>
-                <View style={styles.homeProgressBar}>
-                  <View style={[styles.homeProgressFill, { width: `${currentProgress}%` }]} />
-                </View>
-                <Text style={styles.progressHint}>Tap to update progress →</Text>
-              </Pressable>
             </View>
 
             <View style={styles.heroFooter}>
-              <Text style={styles.eyebrow}>Focused TNPSC Journey</Text>
+              <Text style={styles.eyebrow}>Phase 1: The Siege</Text>
             </View>
+
+            <Pressable onPress={() => setPage('progress')} style={styles.homeProgressBox}>
+              <View style={styles.homeProgressHeader}>
+                <Text style={styles.homeProgressTitle}>Syllabus Progress</Text>
+                <Text style={styles.homeProgressValue}>{currentProgress}%</Text>
+              </View>
+              <View style={styles.homeProgressBar}>
+                <View style={[styles.homeProgressFill, { width: `${currentProgress}%` }]} />
+              </View>
+              <Text style={styles.progressHint}>Next up: {getTodayTopic()}</Text>
+            </Pressable>
           </View>
+
+          {prepLevel === 'pro' ? (
+            <Pressable onPress={() => setPage('testSeries')} style={styles.mainActionPanel}>
+              <Text style={styles.mainActionLabel}>EXAM SERIES</Text>
+              <Text style={styles.mainActionTitle}>Take Full-Length Mock Test</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setPage('strategy')} style={styles.mainActionPanel}>
+              <Text style={styles.mainActionLabel}>STRATEGY HUB</Text>
+              <Text style={styles.mainActionTitle}>Your Precision Attack Plan</Text>
+            </Pressable>
+          )}
+
+
 
           <View style={styles.strategyHighlightBox}>
             <View style={styles.strategyHeader}>
@@ -461,18 +544,9 @@ export default function App() {
             ))}
           </View>
 
-          <Pressable
-            onPress={() => setPage(prepLevel === 'pro' ? 'testSeries' : 'resources')}
-            style={({ pressed }) => [
-              styles.resourcesButton,
-              pressed && styles.buttonPressed,
-            ]}
-          >
-            <Text style={styles.resourcesButtonText}>
-              {prepLevel === 'pro' ? 'Test Series Hub' : 'Resources & Planner'}
-            </Text>
-          </Pressable>
-        </View>
+
+          <View style={{height: 150}} />
+        </ScrollView>
       ) : page === 'strategy' ? (
         <View style={styles.page}>
           <View style={styles.topBar}>
@@ -482,35 +556,90 @@ export default function App() {
             <View style={styles.topBarSpacer} />
           </View>
 
-          <View style={styles.infoCard}>
-            <Text style={styles.infoEyebrow}>Strategy</Text>
-            <Text style={styles.infoTitle}>Priority Units</Text>
-            <Text style={styles.infoText}>Units ordered by weightage. Target high-scoring areas first.</Text>
-            
-            {selectedExam !== 'group4' && (
-              <View style={styles.subTabContainer}>
-                <Pressable onPress={() => setSubTab('prelims')} style={[styles.subTab, subTab === 'prelims' && styles.activeSubTab]}>
-                  <Text style={[styles.subTabText, subTab === 'prelims' && styles.activeSubTabText]}>Prelims</Text>
-                </Pressable>
-                <Pressable onPress={() => setSubTab('mains')} style={[styles.subTab, subTab === 'mains' && styles.activeSubTab]}>
-                  <Text style={[styles.subTabText, subTab === 'mains' && styles.activeSubTabText]}>Mains</Text>
-                </Pressable>
+          <View style={[styles.infoCard, {flex: 1, marginTop: 0, marginBottom: 10}]}>
+            <View style={styles.strategyHeaderRow}>
+              <View style={{flex: 1}}>
+                <Text style={styles.infoEyebrow}>Strategy</Text>
+                <Text style={styles.infoTitle}>{strategyView === 'attack' ? 'Your Attack Plan' : 'Priority Units'}</Text>
+              </View>
+              <Pressable 
+                onPress={() => setStrategyView(strategyView === 'attack' ? 'ordered' : 'attack')}
+                style={styles.strategyToggleBtn}
+              >
+                <Text style={styles.strategyToggleBtnText}>{strategyView === 'attack' ? 'Show List' : 'Analyze Plan'}</Text>
+              </Pressable>
+            </View>
+
+            {subTab === 'mains' ? (
+              <View style={styles.mainsPlaceholder}>
+                <Text style={styles.mainsPlaceholderTitle}>🚧 Under Development</Text>
+                <Text style={styles.mainsPlaceholderText}>Strategy is currently optimized for Prelims. Mains-specific attack plans are being prepared.</Text>
+              </View>
+            ) : strategyView === 'attack' ? (
+              <View style={styles.attackPlanContainer}>
+                <View style={styles.attackStatsRow}>
+                  <View style={styles.attackStatItem}>
+                    <Text style={styles.attackStatLabel}>TARGET</Text>
+                    <Text style={styles.attackStatValue}>{targetMarks} / 300</Text>
+                  </View>
+                  <View style={styles.attackStatItem}>
+                    <Text style={styles.attackStatLabel}>SECURED</Text>
+                    <Text style={styles.attackStatValue}>{currentScore}</Text>
+                  </View>
+                  <View style={styles.attackStatItem}>
+                    <Text style={styles.attackStatLabel}>GAP</Text>
+                    <Text style={[styles.attackStatValue, { color: markGap > 0 ? '#eb7828' : '#59a13f' }]}>{markGap}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.attackAdviceBox}>
+                  <Text style={styles.attackAdviceTitle}>🛡️ The Siege Strategy</Text>
+                  <Text style={styles.attackAdviceText}>
+                    {markGap > 0 
+                      ? `You need ${markGap} more marks to hit the safe zone. Focus on high-weightage units below to bridge the gap.`
+                      : "Target achieved! You are in the safe zone. Maintain revision to stay sharp."}
+                  </Text>
+                </View>
+
+                <ScrollView style={{flex: 1}} showsVerticalScrollIndicator={false}>
+                   {sortedStrategyUnits
+                     .filter(unit => unit.topics.some(t => !completedTopics.includes(t)))
+                     .map((unit, idx) => (
+                       <View key={unit.id} style={styles.attackUnitItem}>
+                         <Text style={styles.attackUnitTitle}>{unit.title}</Text>
+                         <Text style={styles.attackUnitWeight}>{unit.weightage} remaining</Text>
+                         <View style={styles.attackActionRow}>
+                           <Text style={styles.attackActionHint}>Suggestion: {parseFloat(unit.weightage) > 15 ? 'Deep Dive' : 'Minimalist'}</Text>
+                         </View>
+                       </View>
+                     ))
+                   }
+                   <View style={{height: 40}} />
+                </ScrollView>
+              </View>
+            ) : (
+              <View style={{flex: 1}}>
+                <Text style={styles.infoText}>Units ordered by weightage. Target high-scoring areas first.</Text>
+                
+
+
+                <ScrollView style={{marginTop: 10, flex: 1}} showsVerticalScrollIndicator={false}>
+                  {sortedStrategyUnits.map((unit, index) => (
+                    <View key={unit.id} style={styles.strategyUnit}>
+                      <Text style={styles.strategyUnitTitle}>{index + 1}. {unit.title}</Text>
+                      <Text style={styles.strategyUnitMarks}>Weightage: {unit.weightage}</Text>
+                    </View>
+                  ))}
+                  <View style={{height: 40}} />
+                </ScrollView>
+                
+                <View style={styles.targetMarksBoxFixed}>
+                  <Text style={styles.targetMarksTitleLarge}>Target: {targetMarks} / 300 Marks</Text>
+                  <Text style={styles.targetMarksSub}>Highest previous cutoff + 10 marks safety buffer.</Text>
+                </View>
               </View>
             )}
-
-            <ScrollView style={{marginTop: 10}} showsVerticalScrollIndicator={false}>
-              {sortedStrategyUnits.map((unit, index) => (
-                <View key={unit.id} style={styles.strategyUnit}>
-                  <Text style={styles.strategyUnitTitle}>{index + 1}. {unit.title}</Text>
-                  <Text style={styles.strategyUnitMarks}>Weightage: {unit.weightage}</Text>
-                </View>
-              ))}
-              
-              <View style={styles.targetMarksBox}>
-                <Text style={styles.targetMarksTitle}>Target: 170+/200 Questions</Text>
-                <Text style={styles.targetMarksSub}>Ordered by weightage for maximum impact.</Text>
-              </View>
-            </ScrollView>
+            <Text style={styles.phase2Note}>🛡️ Mains specific strategy will be unlocked in phase 2.</Text>
           </View>
         </View>
       ) : page === 'progress' ? (
@@ -534,13 +663,26 @@ export default function App() {
 
           <ScrollView style={styles.resourceContent} showsVerticalScrollIndicator={false}>
             {selectedExam !== 'group4' && (
-              <View style={styles.subTabContainer}>
-                <Pressable onPress={() => setSubTab('prelims')} style={[styles.subTab, subTab === 'prelims' && styles.activeSubTab]}>
-                  <Text style={[styles.subTabText, subTab === 'prelims' && styles.activeSubTabText]}>Prelims</Text>
-                </Pressable>
-                <Pressable onPress={() => setSubTab('mains')} style={[styles.subTab, subTab === 'mains' && styles.activeSubTab]}>
-                  <Text style={[styles.subTabText, subTab === 'mains' && styles.activeSubTabText]}>Mains</Text>
-                </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 16 }}>
+                <View style={styles.subTabContainer}>
+                  <Pressable onPress={() => setSubTab('prelims')} style={[styles.subTab, subTab === 'prelims' && styles.activeSubTab]}>
+                    <Text style={[styles.subTabText, subTab === 'prelims' && styles.activeSubTabText]}>Prelims</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setSubTab('mains')} style={[styles.subTab, subTab === 'mains' && styles.activeSubTab]}>
+                    <Text style={[styles.subTabText, subTab === 'mains' && styles.activeSubTabText]}>Mains</Text>
+                  </Pressable>
+                </View>
+
+                {selectedExam === 'group2' && subTab === 'prelims' && (
+                  <View style={styles.langToggleContainer}>
+                    <Pressable onPress={() => setSelectedLanguage('tamil')} style={[styles.langBtn, selectedLanguage === 'tamil' && styles.langBtnActive]}>
+                      <Text style={[styles.langBtnText, selectedLanguage === 'tamil' && styles.langBtnTextActive]}>தமிழ்</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setSelectedLanguage('english')} style={[styles.langBtn, selectedLanguage === 'english' && styles.langBtnActive]}>
+                      <Text style={[styles.langBtnText, selectedLanguage === 'english' && styles.langBtnTextActive]}>ENG</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
             {activeSyllabus.map((unit) => (
@@ -566,6 +708,7 @@ export default function App() {
                 )}
               </View>
             ))}
+            <View style={{ height: 120 }} />
           </ScrollView>
         </View>
       ) : page === 'resources' ? (
@@ -608,6 +751,16 @@ export default function App() {
           </View>
 
           <ScrollView style={styles.resourceContent} showsVerticalScrollIndicator={false}>
+            {resourceTab === 'syllabus' && selectedExam === 'group2' && (
+              <View style={[styles.langToggleContainer, { alignSelf: 'flex-end', marginRight: 16, marginBottom: 12 }]}>
+                <Pressable onPress={() => setSelectedLanguage('tamil')} style={[styles.langBtn, selectedLanguage === 'tamil' && styles.langBtnActive]}>
+                  <Text style={[styles.langBtnText, selectedLanguage === 'tamil' && styles.langBtnTextActive]}>தமிழ்</Text>
+                </Pressable>
+                <Pressable onPress={() => setSelectedLanguage('english')} style={[styles.langBtn, selectedLanguage === 'english' && styles.langBtnActive]}>
+                  <Text style={[styles.langBtnText, selectedLanguage === 'english' && styles.langBtnTextActive]}>ENG</Text>
+                </Pressable>
+              </View>
+            )}
             {resourceTab === 'planner' ? (
               <View>
                 <Text style={styles.sectionTitle}>{activeExamInfo?.name} Schedule</Text>
@@ -700,6 +853,7 @@ export default function App() {
                 </View>
               </View>
             )}
+            <View style={{ height: 120 }} />
           </ScrollView>
         </View>
       ) : page === 'testSeries' ? (
@@ -710,13 +864,22 @@ export default function App() {
             </Pressable>
             <View style={styles.topBarSpacer} />
           </View>
-          <ScrollView style={styles.resourceContent}>
-             <View style={styles.testCard}>
-                <Text style={styles.testTitle}>Full Mock Test #1</Text>
-                <Text style={styles.testMeta}>200 Qs • 3 Hours</Text>
-                <Pressable style={styles.startTestButton}><Text style={styles.startTestButtonText}>Start</Text></Pressable>
-             </View>
-             <View style={styles.comingSoonBox}><Text style={styles.comingSoonText}>More coming soon!</Text></View>
+          <ScrollView style={styles.resourceContent} showsVerticalScrollIndicator={false}>
+             {(prepLevel === 'pro' || currentScore >= targetMarks) ? (
+               <View style={styles.testCard}>
+                  <Text style={styles.testTitle}>Full Mock Test #1</Text>
+                  <Text style={styles.testMeta}>200 Qs • 3 Hours</Text>
+                  <Pressable style={styles.startTestButton}><Text style={styles.startTestButtonText}>Start</Text></Pressable>
+               </View>
+             ) : (
+               <View style={styles.lockedTestCard}>
+                 <Text style={styles.lockIcon}>🔒</Text>
+                 <Text style={styles.lockedTitle}>Mock Test Locked</Text>
+                 <Text style={styles.lockedText}>Achieve your Siege Target of {targetMarks} Marks to unlock full-length mock tests.</Text>
+               </View>
+             )}
+             <View style={styles.comingSoonBox}><Text style={styles.comingSoonText}>Topic-wise practice tests coming soon!</Text></View>
+             <View style={{ height: 100 }} />
           </ScrollView>
         </View>
       ) : (
@@ -744,11 +907,11 @@ export default function App() {
             </Pressable>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Focus is Key</Text>
-              <Text style={styles.modalWarning}>"Focus on one exam to get more improvement."</Text>
             </View>
-
-            <View style={styles.metaphorBox}>
-               <Text style={styles.horseMetaphor}>"If we chase multiple horses, we may not catch even one."</Text>
+            <View style={styles.wisdomCard}>
+              <Text style={styles.wisdomText}>
+                If we chase multiple horses, we may not catch even one. Focus on one exam to get more improvement.
+              </Text>
             </View>
 
             <Text style={styles.switchTitle}>Switch Target Exam:</Text>
@@ -759,7 +922,7 @@ export default function App() {
                 style={[styles.examOptionModal, selectedExam === ex && styles.examOptionSelected]}
               >
                 <Text style={styles.examOptionLabelSmall}>{examConfig[ex].name}</Text>
-                {selectedExam === ex && <View style={styles.activeIndicator} />}
+                {selectedExam === ex && <View style={styles.examOptionSelectedOverlay} />}
               </Pressable>
             ))}
             
@@ -769,6 +932,22 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+        {selectedExam !== null && prepLevel !== null && (prepLevel !== 'intermediate' || isIntermediateSetupDone) && page !== 'guest' && page !== 'strategy' && (
+  <View style={styles.navBar}>
+    <Pressable onPress={() => setPage('home')} style={({pressed}) => [styles.navItem, page === 'home' && styles.navItemActive, pressed && styles.buttonPressed]}>
+      <Text style={[styles.navText, page === 'home' ? styles.navTextActive : styles.navTextInactive]}>Home</Text>
+    </Pressable>
+    <Pressable onPress={() => setPage('resources')} style={({pressed}) => [styles.navItem, page === 'resources' && styles.navItemActive, pressed && styles.buttonPressed]}>
+      <Text style={[styles.navText, page === 'resources' ? styles.navTextActive : styles.navTextInactive]}>Resources</Text>
+    </Pressable>
+    <Pressable onPress={() => setPage('testSeries')} style={({pressed}) => [styles.navItem, page === 'testSeries' && styles.navItemActive, pressed && styles.buttonPressed]}>
+      <Text style={[styles.navText, page === 'testSeries' ? styles.navTextActive : styles.navTextInactive]}>Tests</Text>
+    </Pressable>
+  </View>
+)}
+
+
     </SafeAreaView>
   );
 }
@@ -807,7 +986,7 @@ const styles = StyleSheet.create({
   countdownContainer: { alignItems: 'center' },
   countdownValue: { color: '#1a3a12', fontSize: 72, fontWeight: '900', lineHeight: 72 },
   countdownLabel: { color: '#6e9e5a', fontSize: 12, fontWeight: '800', letterSpacing: 4, marginTop: -4 },
-  homeProgressBox: { width: '100%', marginTop: 24 },
+  homeProgressBox: { width: '100%', marginTop: 20 },
   homeProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   homeProgressTitle: { color: '#6e9e5a', fontSize: 11, fontWeight: '800' },
   homeProgressValue: { color: '#2f5e1f', fontSize: 16, fontWeight: '900' },
@@ -866,9 +1045,9 @@ const styles = StyleSheet.create({
   checkTextDone: { textDecorationLine: 'line-through', color: '#999' },
   finishButton: { backgroundColor: '#59a13f', paddingVertical: 18, borderRadius: 20, alignItems: 'center', marginTop: 10 },
   finishButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  strategyUnit: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12 },
-  strategyUnitTitle: { color: '#333', fontSize: 15, fontWeight: '700' },
-  strategyUnitMarks: { color: '#59a13f', fontSize: 12, fontWeight: '800' },
+  strategyUnit: { backgroundColor: '#fff', borderRadius: 20, padding: 22, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(89, 161, 63, 0.08)' },
+  strategyUnitTitle: { color: '#333', fontSize: 18, fontWeight: '700' },
+  strategyUnitMarks: { color: '#59a13f', fontSize: 14, fontWeight: '800', marginTop: 4 },
   targetMarksBox: { backgroundColor: 'rgba(89, 161, 63, 0.05)', borderRadius: 16, padding: 16, alignItems: 'center' },
   targetMarksTitle: { color: '#2f5e1f', fontSize: 16, fontWeight: '800' },
   targetMarksSub: { color: '#6e9e5a', fontSize: 12 },
@@ -921,13 +1100,12 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#fff', borderRadius: 32, padding: 28, borderWidth: 2, borderColor: 'rgba(89, 161, 63, 0.2)' },
   modalHeader: { alignItems: 'center', marginBottom: 24 },
   modalTitle: { color: '#1a3a12', fontSize: 24, fontWeight: '900', marginBottom: 8 },
-  modalWarning: { color: '#eb7828', fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  metaphorBox: { backgroundColor: 'rgba(89, 161, 63, 0.08)', padding: 16, borderRadius: 20, marginBottom: 24, borderStyle: 'dashed', borderWidth: 1, borderColor: '#59a13f' },
-  horseMetaphor: { color: '#2f5e1f', fontSize: 14, fontWeight: '800', textAlign: 'center', lineHeight: 20 },
+  wisdomCard: { backgroundColor: 'rgba(235, 120, 40, 0.05)', borderRadius: 24, padding: 22, marginBottom: 28, borderWidth: 1, borderColor: 'rgba(235, 120, 40, 0.15)', borderStyle: 'dashed' },
+  wisdomText: { color: '#eb7828', fontSize: 16, fontWeight: '800', textAlign: 'center', lineHeight: 24, fontStyle: 'italic' },
   switchTitle: { color: '#6e9e5a', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1 },
   examOptionModal: { backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
   examOptionLabelSmall: { color: '#2f5e1f', fontSize: 16, fontWeight: '800' },
-  activeIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#59a13f' },
+   examOptionSelectedOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(89, 161, 63, 0.08)', borderRadius: 16 },
   modalButtonPrimary: { backgroundColor: '#59a13f', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
   aboutManifestoCard: { backgroundColor: '#fff', borderRadius: 24, padding: 24, marginBottom: 16 },
   aboutManifestoCardSecondary: { backgroundColor: 'rgba(255, 242, 170, 0.4)', borderRadius: 24, padding: 24, marginBottom: 16 },
@@ -956,7 +1134,75 @@ const styles = StyleSheet.create({
   topicItemRead: { paddingVertical: 8 },
   topicTextRead: { color: '#444', fontSize: 14, lineHeight: 20 },
 
-  buttonPressed: { opacity: 0.7 },
+  strategyHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  strategyToggleBtn: { backgroundColor: 'rgba(89, 161, 63, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  strategyToggleBtnText: { color: '#59a13f', fontSize: 12, fontWeight: '800' },
+  attackPlanContainer: { flex: 1 },
+  attackStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, backgroundColor: 'rgba(89, 161, 63, 0.05)', padding: 16, borderRadius: 20 },
+  attackStatItem: { alignItems: 'center' },
+  attackStatLabel: { color: '#6e9e5a', fontSize: 10, fontWeight: '800', marginBottom: 4 },
+  attackStatValue: { color: '#1a3a12', fontSize: 20, fontWeight: '900' },
+  attackAdviceBox: { backgroundColor: '#fff', padding: 16, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(89, 161, 63, 0.1)' },
+  attackAdviceTitle: { color: '#1a3a12', fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  attackAdviceText: { color: '#444', fontSize: 13, lineHeight: 18 },
+  attackUnitItem: { backgroundColor: '#fff', padding: 20, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(89, 161, 63, 0.08)' },
+  attackUnitTitle: { color: '#1a3a12', fontSize: 16, fontWeight: '800' },
+  attackUnitWeight: { color: '#6e9e5a', fontSize: 14, fontWeight: '700' },
+  attackActionRow: { marginTop: 6 },
+  attackActionHint: { color: '#eb7828', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+
+  mainsPlaceholder: { backgroundColor: 'rgba(235, 120, 40, 0.05)', padding: 24, borderRadius: 24, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(235, 120, 40, 0.2)', marginTop: 20 },
+  mainsPlaceholderTitle: { color: '#eb7828', fontSize: 16, fontWeight: '900', marginBottom: 8 },
+  mainsPlaceholderText: { color: '#444', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+
+  setupUnit: { marginBottom: 24 },
+  setupUnitHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  setupUnitTitle: { color: '#2f5e1f', fontSize: 16, fontWeight: '800' },
+  setupCheckbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#59a13f', marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  setupCheckboxActive: { backgroundColor: '#59a13f' },
+  setupCheckboxInner: { width: 10, height: 10, borderRadius: 2, backgroundColor: '#fff' },
+  setupTopicsPanel: { backgroundColor: '#fff', padding: 16, borderRadius: 20, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  setupTopicRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  setupCheckboxMini: { width: 18, height: 18, borderRadius: 6, borderWidth: 2, borderColor: 'rgba(89, 161, 63, 0.2)', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+  setupCheckboxInnerMini: { width: 8, height: 8, borderRadius: 2, backgroundColor: '#fff' },
+  
+  langToggleContainer: { flexDirection: 'row', backgroundColor: 'rgba(89, 161, 63, 0.05)', borderRadius: 10, padding: 3 },
+  langBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  langBtnActive: { backgroundColor: '#59a13f' },
+  langBtnText: { fontSize: 11, fontWeight: '800', color: '#6e9e5a' },
+  langBtnTextActive: { color: '#fff' },
+  
+  setupTopicText: { color: '#444', fontSize: 14, fontWeight: '600' },
+  setupTopicTextCompleted: { color: '#bbb', textDecorationLine: 'line-through' },
+  phase2Note: { color: '#6e9e5a', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 12, fontStyle: 'italic' },
+  setupFooterFixed: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 22, backgroundColor: '#f4d72d', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+
+  targetMarksBoxFixed: { backgroundColor: '#1a3a12', borderRadius: 20, padding: 16, alignItems: 'center', marginTop: 12 },
+  targetMarksTitleLarge: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  setupBtn: { backgroundColor: '#59a13f', paddingVertical: 18, borderRadius: 24, alignItems: 'center' },
+  setupBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
+  lockIcon: { fontSize: 40, marginBottom: 12 },
+  lockedTestCard: { backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 24, padding: 40, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(0,0,0,0.1)' },
+  lockedTitle: { color: '#1a3a12', fontSize: 18, fontWeight: '900', marginBottom: 8 },
+  lockedText: { color: '#666', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+
+  examSeriesFullBtn: { backgroundColor: '#1a3a12', padding: 20, borderRadius: 24, marginTop: 12 },
+  examSeriesLabel: { color: '#6e9e5a', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  examSeriesTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4 },
+
+  mainActionPanel: { backgroundColor: '#59a13f', padding: 24, borderRadius: 28, marginTop: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  mainActionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '900', letterSpacing: 2, marginBottom: 4 },
+  mainActionTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+
+  navBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 12, paddingBottom: 34, borderTopWidth: 1, borderTopColor: 'rgba(89, 161, 63, 0.12)', justifyContent: 'space-around', zIndex: 100, borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 20 },
+  navItem: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  navItemActive: { backgroundColor: 'rgba(89, 161, 63, 0.08)' },
+  navText: { fontSize: 18, fontWeight: '700', letterSpacing: 0.5 },
+  navTextActive: { color: '#1a3a12', fontWeight: '900' },
+  navTextInactive: { color: '#8eb37d' },
+
+  buttonPressed: { opacity: 0.6 },
   clearButton: { marginTop: 20, backgroundColor: 'rgba(235, 70, 70, 0.1)', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   clearButtonText: { color: '#a32a2a', fontSize: 14, fontWeight: '800' },
 });
