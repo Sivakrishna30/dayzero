@@ -1,65 +1,98 @@
-# DayZero: Strategy & Revision Roadmap
-**Motto:** *"Syllabus is the Boundary"*
+# DayZero: Strategy, Revision, and Layout Architecture Plan
 
-## 1. Core Philosophy: The Ebbinghaus Forgetting Curve
-Human memory is a **"bucket with a hole."** Information leaks out naturally over time. To achieve permanent storage, we must "refill" the bucket at strategic intervals before it goes empty.
-
-### The 1-3-7-21 Rule (The Revision Engine)
-- **Day 0:** Initial Study (Input).
-- **Day 1 (24 hrs):** 1st Review. Prevents the initial 50% "steep drop" in memory.
-- **Day 3:** 2nd Review. Solidifies conceptual connections.
-- **Day 7:** 3rd Review. Signals the brain that this info is "Long-Term Essential."
-- **Day 21:** Final Review. Locks the data into Permanent Storage.
+This implementation plan details the immediate UI layout fixes and lays out the functional architecture for the 5 major long-term features of the **DayZero** TNPSC study companion.
 
 ---
 
-## 2. Phase 1: The Strategy Redesign
-We are removing the generic strategy panel and replacing it with a **"Define Strategy"** workflow.
+## User Review Required
 
-### A. Weightage-Based Unit Reordering
-- **Exam-Specific Data:** Every exam (Group 1, 2, 4) has a different weightage profile.
-- **Manual Priority:** Users can drag and drop units to create their personal "Attack Plan."
-- **Boundary Check:** Explicitly marking "Out of Syllabus" topics to prevent overstudying.
+Please review the proposed design choices for the Android layout fix and the feature specifications before we begin execution:
 
-### B. Depth Control (Learning Modes)
-Users can toggle the depth for each topic:
-- **Deep Learning:** Full mastery, detailed notes, and advanced tests. (Use for high-weightage units like Unit 8 or Aptitude).
-- **Minimalist Requirement:** Focus on basics, high-yield facts, and PYQs only. (Use for "vast but low-mark" units like General Science or disliked subjects like Economics).
+> [!IMPORTANT]
+> **Android Layout Resolution (Translucent vs. Solid Boundary):**
+> We have two ways to resolve the top (status bar) and bottom (navigation buttons) overlap:
+> 1. **Solid boundaries (Recommended):** Change `"edgeToEdgeEnabled": false` in `app.json`. This completely disables the app rendering behind the status and navigation bars on Android. The OS handles bounds perfectly, preventing any overlaps or tap interference across all Android versions/devices without requiring extra package installations.
+> 2. **Adjusted translucent padding:** Keep `"edgeToEdgeEnabled": true` and apply custom top padding `RNStatusBar.currentHeight` to the `safeArea` and bottom padding to the navigation bar. 
+> *Our recommendation is Option 1 (changing `edgeToEdgeEnabled` to `false`) for guaranteed, native, and bulletproof safety. Please confirm if this is acceptable.*
 
 ---
 
-## 3. Phase 2: The Study & Test Hub
-Transforming topics into active learning modules.
+## Proposed Changes & Feature Architecture
 
-### A. The Study Page
-- **Topic Info:** High-yield notes derived strictly from the syllabus.
-- **Revision Notes:** Condensed "Cheat Sheets" for the 1-3-7-21 reviews.
-- **Embedded Drill:** A 5-10 question "Topic Test" at the end of every study session.
+We will implement the initial changes in a structured phase: **Phase 1A: UI Correction & Decluttering**, followed by incremental feature branches for the remaining items.
 
-### B. The Revision Queue
-- **"Due Today" Dashboard:** A home-screen widget showing exactly what needs refilling today based on the 1-3-7-21 logic.
-- **No Backlog Pressure:** Intelligent rescheduling if a revision is missed.
+```mermaid
+graph TD
+    A[UI & Layout Fixes] --> B[1. Simplified Syllabus File Check]
+    A --> C[2. TNSERT 6th-12th Study Notes & Editor]
+    A --> D[3. Topic Quizzes & Weak Zone Analysis]
+    A --> E[4. Ebbinghaus 1-3-7-21 Revision Engine]
+    A --> F[5. Eligibility Calculator & Notifications]
+```
+
+### 1. UI & Layout Corrections [IMMEDIATE]
+
+#### [MODIFY] [app.json](file:///c:/Users/DELL/Downloads/DayZero/app.json)
+* Disable `edgeToEdgeEnabled` or adjust configuration for safe-area compliance.
+* Ensure consistent status bar styling.
+
+#### [MODIFY] [App.js](file:///c:/Users/DELL/Downloads/DayZero/App.js)
+* **Status Bar & Navigation:** Import `Platform` and `StatusBar` from `'react-native'`. Apply safe top paddings `paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0` to `safeArea` style if needed.
+* **Home Page Decluttering:** 
+  * Remove `progressHint` text (`"Next up: ..."`) from the progress container.
+  * Completely remove `strategyHighlightBox` ("Today's Focus: Top 3 Units").
+  * Ensure the home dashboard looks premium, minimal, and showcases only the progress bars, countdown timer numbers, and a single main action button to enter the hubs.
+
+---
+
+### 2. Major Action Items Architecture [LONG-TERM]
+
+#### Feature 1: Simple Syllabus Check
+* **Goal:** Keep the official interactive syllabus tracker clean, lightweight, and offline-based. No over-engineered database syncs. 
+* **Design:** Users can view the structural lists and toggle completion checkboxes, reading data directly from `syllabus.js`.
+
+#### Feature 2: TNSERT (Tamil Nadu State Board 6th-12th) Notes Integration
+* **Goal:** Study strictly what is needed using official school book lines, derivations, and relevant current affairs without bloated academy notes.
+* **Design:**
+  * In the Interactive Syllabus page, tapping a topic will open a **"Topic Details & TNSERT Notes"** modal.
+  * We will pre-populate high-yield summaries, key equations, and quotes from TN State Board (Samacheer Kalvi) 6th-12th textbooks for important exam topics (e.g. Thirukkural, Indian Polity highlights, Aptitude formulas).
+  * We will provide an **Interactive Notes Editor** under each topic. The user can type their own textbook derivations, notes, and local current affairs.
+  * Data is saved persistently inside `AsyncStorage` under a `user_topic_notes` key.
+
+#### Feature 3: Test Series & Weakness Analysis
+* **Goal:** Practice topic-wise and full-length tests, identifying where the user is dropping marks.
+* **Design:**
+  * Add a **"Topic Practice Quiz"** (5-10 multiple choice questions) under each topic modal, and a **"Mock Test Series"** (full-length/unit-wise tests) under the Tests tab.
+  * Create a **Results Analysis Dashboard**:
+    * Display raw score, accuracy, and time taken.
+    * Break down questions by syllabus sub-topic.
+    * Identify **"Weak Zones"** (topics with low accuracy) and present direct **"Active Recall"** button links that open the study notes modal for those specific weak areas.
+
+#### Feature 4: Ebbinghaus 1-3-7-21 Revision Tracker
+* **Goal:** Review topics at intervals of 1, 3, 7, and 21 days to prevent memory decay.
+* **Design:**
+  * When a topic is checked as completed, we record a `completedAt` timestamp and queue it in the Ebbinghaus scheduler.
+  * Calculate target revision times:
+    * **Review 1:** +1 day (24 hours)
+    * **Review 2:** +3 days
+    * **Review 3:** +7 days
+    * **Review 4:** +21 days
+  * Build a **"Due Today" Revision Queue** widget/dashboard view that shows exactly what needs a review session today.
+  * Allow marked-off revisions to advance to the next Ebbinghaus milestone. Include automatic, anxiety-free rescheduling if a revision date is missed.
+
+#### Feature 5: Eligibility Calculator & Exam Notification Panel
+* **Goal:** Check age limits and degree compatibilities, and show upcoming notification dates.
+* **Design:**
+  * Add an **"Eligibility Calculator"** tab in the Resources panel:
+    * Let the user input their Date of Birth, Education Level (SSLC, HSC, Diploma, Degree), and Community Category (GT, BC, MBC, SC, ST).
+    * Calculate and display eligibility for Group 1, Group 2, and Group 4 (e.g., checking age restrictions: Group 1 Max Age 34, Group 4 SSLC minimums).
+  * Build an **"Important Dates Timeline"** showing upcoming official announcement and application deadlines with color-coded alerts (Active, Upcoming, Closed).
 
 ---
 
-## 4. Phase 3: The Final Assault (Tests)
-- **PYQ Integration:** Topic-wise Previous Year Questions.
-- **Mock Exam Series:** Full-length 200-question simulations in the final 30 days of the countdown.
-- **Time-Aware Planning:** All study/test goals are dynamically adjusted based on the `Days to Go` counter.
+## Verification Plan
 
----
-
-## 5. Phase 4: Test Series Analysis & History
-Closing the feedback loop through performance intelligence.
-
-### A. Post-Test Analysis
-- **Dynamic Feedback:** After each test, the app provides a breakdown of marks and identifies specific "Weak Zones."
-- **Mastery Scoring:** Identifying topics that need "More Learning" vs. those that are "Exam Ready."
-- **Active Recall Links:** Direct links to revisit the study pages for missed questions.
-
-### B. Performance History
-- **Test Archives:** Maintaining a chronological record of all previous tests, scores, and time taken.
-- **Overall Analytics:** A "Mastery Dashboard" showing your improvement curve and syllabus coverage percentage based on test accuracy.
-
----
-*Stay Focused. Stay Resolute.*
+### Automated & Manual Verification
+1. **Layout Integrity:** Verify on Android devices that the top-bar header is pushed safely below the camera cutout/status bar, and the bottom absolute-positioned tab bar sits comfortably above the system navigation line.
+2. **Dashboard Cleanliness:** Ensure the main Home page contains no unit listings or text hints, and renders a premium minimalist dashboard.
+3. **Persisted Notes & Quizzes:** Take sample quizzes, write custom notes, and verify that progress, notes, and results persist successfully through app reboots.

@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Pressable, SafeAreaView, StyleSheet, Text, View, ScrollView, Modal } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View, ScrollView, Modal, Platform } from 'react-native';
 import { syllabusData } from './syllabus';
 
 export default function App() {
@@ -507,7 +507,6 @@ export default function App() {
               <View style={styles.homeProgressBar}>
                 <View style={[styles.homeProgressFill, { width: `${currentProgress}%` }]} />
               </View>
-              <Text style={styles.progressHint}>Next up: {getTodayTopic()}</Text>
             </Pressable>
           </View>
 
@@ -525,27 +524,7 @@ export default function App() {
 
 
 
-          <View style={styles.strategyHighlightBox}>
-            <View style={styles.strategyHeader}>
-              <Text style={styles.strategyTitle}>Today's Focus: Top 3 Units</Text>
-              <Pressable onPress={() => setPage('strategy')}>
-                <Text style={styles.viewAllLink}>Full Strategy →</Text>
-              </Pressable>
-            </View>
-            
-            {sortedStrategyUnits.slice(0, 3).map((unit, idx) => (
-              <View key={unit.id} style={styles.strategyUnitMini}>
-                <View style={styles.unitRank}>
-                  <Text style={styles.unitRankText}>{idx + 1}</Text>
-                </View>
-                <Text style={styles.unitNameMini} numberOfLines={1}>{unit.title}</Text>
-                <Text style={styles.unitMarksMini}>{unit.weightage || unit.marks}</Text>
-              </View>
-            ))}
-          </View>
-
-
-          <View style={{height: 150}} />
+          <View style={{height: 100}} />
         </ScrollView>
       ) : page === 'strategy' ? (
         <View style={styles.page}>
@@ -1195,7 +1174,7 @@ const styles = StyleSheet.create({
   mainActionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '900', letterSpacing: 2, marginBottom: 4 },
   mainActionTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
 
-  navBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 12, paddingBottom: 34, borderTopWidth: 1, borderTopColor: 'rgba(89, 161, 63, 0.12)', justifyContent: 'space-around', zIndex: 100, borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 20 },
+  navBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 12, borderTopWidth: 1, borderTopColor: 'rgba(89, 161, 63, 0.12)', justifyContent: 'space-around', zIndex: 100, borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 20 },
   navItem: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   navItemActive: { backgroundColor: 'rgba(89, 161, 63, 0.08)' },
   navText: { fontSize: 18, fontWeight: '700', letterSpacing: 0.5 },
