@@ -203,7 +203,7 @@ export const syllabusData = {
             }
           ]
         }
-      ]
+      }
     }
   },
   group2: {
