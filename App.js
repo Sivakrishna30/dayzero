@@ -174,10 +174,11 @@ export default function App() {
     return match ? parseInt(match[0], 10) : 0;
   };
 
-  const sortedStrategyUnits = [...activeSyllabus].sort((a, b) => {
-    const wA = a.weightage || a.marks || '';
-    const wB = b.weightage || b.marks || '';
-    return parseWeightage(wB) - parseWeightage(wA);
+  // Sort syllabus by weightage (highest first) for strategic learning
+  const sortedSyllabus = [...activeSyllabus].sort((a, b) => {
+    const wA = parseWeightage(a.weightage || a.marks);
+    const wB = parseWeightage(b.weightage || b.marks);
+    return wB - wA;
   });
 
   const totalTopics = activeSyllabus.reduce((acc, unit) => acc + (unit.topics ? unit.topics.length : 0), 0);
@@ -185,8 +186,6 @@ export default function App() {
   const currentProgress = totalTopics > 0
     ? Math.round((completedTopics.length / totalTopics) * 100)
     : 0;
-
-  const [strategyView, setStrategyView] = useState('ordered');
 
   const getTargetMarks = () => {
     if (selectedExam === 'group1') return 220;
@@ -215,7 +214,7 @@ export default function App() {
   const markGap = Math.max(0, targetMarks - currentScore);
 
   const getTodayTopic = () => {
-    const syllabus = getActiveSyllabus();
+    const syllabus = sortedSyllabus;
     for (const unit of syllabus) {
       const pending = unit.topics.find(t => !completedTopics.includes(t));
       if (pending) return pending;
@@ -555,7 +554,7 @@ export default function App() {
               </View>
             </View>
 
-            {/* Merged Progress + Strategy Hub card */}
+            {/* Progress Card */}
             <Pressable onPress={() => setPage('progress')} style={styles.homeProgressBox}>
               <View style={styles.homeProgressHeader}>
                 <Text style={styles.homeProgressTitle}>Syllabus Progress</Text>
@@ -575,78 +574,10 @@ export default function App() {
                 </View>
               </View>
             </Pressable>
-
-            {/* Strategy Hub embedded below marks */}
-            <Pressable
-              onPress={() => setPage(prepLevel === 'pro' ? 'testSeries' : 'strategy')}
-              style={styles.homeStrategyLink}
-            >
-              <View>
-                <Text style={styles.homeStrategyLinkLabel}>
-                  {prepLevel === 'pro' ? 'EXAM SERIES' : 'STRATEGY HUB'}
-                </Text>
-                <Text style={styles.homeStrategyLinkTitle}>
-                  {prepLevel === 'pro' ? 'Take Full-Length Mock Test' : 'Your Precision Attack Plan →'}
-                </Text>
-              </View>
-            </Pressable>
           </View>
 
           <View style={{height: 100}} />
         </ScrollView>
-      ) : page === 'strategy' ? (
-        <View style={styles.page}>
-          <View style={styles.topBar}>
-            <Pressable onPress={() => setPage('home')} style={styles.backButton}>
-              <Text style={styles.backButtonText}>Back</Text>
-            </Pressable>
-            <View style={styles.topBarSpacer} />
-          </View>
-
-          <View style={styles.strategyContainer}>
-            <View style={styles.strategyHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoEyebrow}>Strategy</Text>
-                <Text style={styles.strategyTitle}>Your Precision Attack Plan</Text>
-              </View>
-            </View>
-
-            <View style={styles.attackAdviceBox}>
-              <Text style={styles.attackAdviceTitle}>The Siege Strategy</Text>
-              <Text style={styles.attackAdviceText}>
-                Focus on the high-weightage priority units below to maximize your score and reach your target safe zone.
-              </Text>
-            </View>
-
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              {sortedStrategyUnits.map((unit, index) => {
-                const isPending = unit.topics.some(t => !completedTopics.includes(t));
-                const suggestion = parseFloat(unit.weightage) > 15 ? 'Deep Dive' : 'Minimalist';
-                return (
-                  <View key={unit.id} style={styles.attackUnitItem}>
-                    <Text style={styles.attackUnitTitle}>{index + 1}. {unit.title}</Text>
-                    <Text style={styles.attackUnitWeight}>
-                      Weightage: {unit.weightage} {isPending ? '(Pending)' : '(Completed)'}
-                    </Text>
-                    <View style={styles.attackActionRow}>
-                      <Text style={styles.attackActionHint}>Suggestion: {suggestion}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-
-              <View style={styles.targetMarksBoxFixed}>
-                <Text style={styles.targetMarksTitleLarge}>
-                  Target: <Text style={styles.targetMarksRed}>{targetMarks} / 300 Marks</Text>
-                </Text>
-                <Text style={styles.targetMarksSub}>Highest previous cutoff + 10 marks safety buffer.</Text>
-              </View>
-
-              <Text style={styles.phase2Note}>Mains specific strategy will be unlocked in phase 2.</Text>
-              <View style={{ height: 40 }} />
-            </ScrollView>
-          </View>
-        </View>
       ) : page === 'progress' ? (
         <View style={styles.page}>
           <View style={styles.topBar}>
@@ -656,9 +587,16 @@ export default function App() {
             <View style={styles.topBarSpacer} />
           </View>
 
+          {/* Simple Philosophy Quote */}
+          <View style={styles.philosophyBox}>
+            <Text style={styles.philosophyText}>
+              "That which is necessary is Dharma. Don't miss the basics."
+            </Text>
+          </View>
+
           <View style={styles.progressHeader}>
-            <Text style={styles.progressPageTitle}>Update Progress</Text>
-            <Text style={styles.progressPageSub}>Mark topics you have completed to update your score.</Text>
+            <Text style={styles.progressPageTitle}>Your Learning Path</Text>
+            <Text style={styles.progressPageSub}>Topics arranged by weightage - Master high-weightage topics first</Text>
 
             <View style={styles.progressStatsRow}>
                <Text style={styles.progressStatText}>{completedTopics.length} / {totalTopics} Topics</Text>
@@ -667,29 +605,136 @@ export default function App() {
           </View>
 
           <ScrollView style={styles.resourceContent} showsVerticalScrollIndicator={false}>
-            {activeSyllabus.map((unit) => (
-              <View key={unit.id} style={styles.collapsibleCard}>
-                <Pressable
-                  onPress={() => setExpandedUnit(expandedUnit === unit.id ? null : unit.id)}
-                  style={styles.collapsibleHeader}
-                >
-                  <View style={{flex: 1}}>
-                    <Text style={styles.collapsibleTitle}>{unit.title}</Text>
-                  </View>
-                  <View style={[styles.arrow, expandedUnit === unit.id && styles.arrowExpanded]} />
-                </Pressable>
-                {expandedUnit === unit.id && (
-                  <View style={styles.collapsibleBody}>
-                    {unit.topics.map((topic, idx) => (
-                      <Pressable key={idx} style={styles.topicItem} onPress={() => toggleTopic(topic)}>
-                        <View style={[styles.topicCheckbox, completedTopics.includes(topic) && styles.topicCheckboxChecked]} />
-                        <Text style={[styles.topicText, completedTopics.includes(topic) && styles.topicTextCompleted]}>{topic}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
+            {sortedSyllabus.map((unit) => {
+              const weight = parseWeightage(unit.weightage || unit.marks);
+              const isPending = unit.topics.some(t => !completedTopics.includes(t));
+              const completedInUnit = unit.topics.filter(t => completedTopics.includes(t)).length;
+              const unitProgress = Math.round((completedInUnit / unit.topics.length) * 100);
+              
+              return (
+                <View key={unit.id} style={styles.collapsibleCard}>
+                  <Pressable
+                    onPress={() => setExpandedUnit(expandedUnit === unit.id ? null : unit.id)}
+                    style={styles.collapsibleHeader}
+                  >
+                    <View style={{flex: 1}}>
+                      <View style={styles.collapsibleTitleRow}>
+                        <Text style={styles.collapsibleTitle}>{unit.title}</Text>
+                        <View style={styles.weightageBadge}>
+                          <Text style={styles.weightageText}>{unit.weightage || unit.marks}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.collapsibleMetaRow}>
+                        <Text style={styles.collapsibleProgress}>{completedInUnit}/{unit.topics.length} topics</Text>
+                        <Text style={styles.collapsiblePercent}>{unitProgress}%</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.arrow, expandedUnit === unit.id && styles.arrowExpanded]} />
+                  </Pressable>
+                  {expandedUnit === unit.id && (
+                    <View style={styles.collapsibleBody}>
+                      {unit.topics.map((topic, idx) => (
+                        <Pressable key={idx} style={styles.topicItem} onPress={() => toggleTopic(topic)}>
+                          <View style={[styles.topicCheckbox, completedTopics.includes(topic) && styles.topicCheckboxChecked]} />
+                          <Text style={[styles.topicText, completedTopics.includes(topic) && styles.topicTextCompleted]}>{topic}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+            <View style={{ height: 120 }} />
+          </ScrollView>
+        </View>
+      ) : page === 'principles' ? (
+        <View style={styles.page}>
+          <View style={styles.topBar}>
+            <Pressable onPress={() => setPage('home')} style={styles.backButton}>
+              <Text style={styles.backButtonText}>Back</Text>
+            </Pressable>
+            <View style={styles.topBarSpacer} />
+          </View>
+
+          <View style={styles.principlesHeader}>
+            <Text style={styles.principlesTitle}>DayZero Principles</Text>
+            <Text style={styles.principlesSubtitle}>Our approach to exam success</Text>
+          </View>
+
+          <ScrollView style={styles.resourceContent} showsVerticalScrollIndicator={false}>
+            {/* Principle 1 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>1</Text>
               </View>
-            ))}
+              <Text style={styles.principleTitle}>One Exam at a Time</Text>
+              <Text style={styles.principleText}>
+                Focus on a single exam target. Switching between multiple exams dilutes your preparation and reduces effectiveness. 
+                Lock your eyes on one target, just like a horse with blinders.
+              </Text>
+            </View>
+
+            {/* Principle 2 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>2</Text>
+              </View>
+              <Text style={styles.principleTitle}>Syllabus-Specific, Exam-Specific Notes</Text>
+              <Text style={styles.principleText}>
+                Unlike other academies that cover topics generically for all exams (Indian Polity for UPSC, SSC, TNPSC alike), 
+                we provide notes tailored specifically to your exam's syllabus. No extra content, no unnecessary information overload.
+              </Text>
+            </View>
+
+            {/* Principle 3 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>3</Text>
+              </View>
+              <Text style={styles.principleTitle}>Conceptual Learning with Examples</Text>
+              <Text style={styles.principleText}>
+                We don't promote rote memorization. Every concept is explained with real-world examples and applications. 
+                This builds deep understanding that helps you tackle twisted and conceptual questions in the exam.
+              </Text>
+            </View>
+
+            {/* Principle 4 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>4</Text>
+              </View>
+              <Text style={styles.principleTitle}>Strategic Revision Plan</Text>
+              <Text style={styles.principleText}>
+                Our revision strategy is based on the 80/20 principle: 80% of marks come from 20% of core concepts. 
+                We help you identify and master these high-weightage topics first, ensuring maximum return on your effort.
+              </Text>
+            </View>
+
+            {/* Principle 5 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>5</Text>
+              </View>
+              <Text style={styles.principleTitle}>Mock Tests & Analysis</Text>
+              <Text style={styles.principleText}>
+                Regular mock tests with detailed performance analysis. We identify your weak subjects and topics, 
+                then focus your energy there. Data-driven improvement, not guesswork.
+              </Text>
+            </View>
+
+            {/* Principle 6 */}
+            <View style={styles.principleCard}>
+              <View style={styles.principleNumber}>
+                <Text style={styles.principleNumberText}>6</Text>
+              </View>
+              <Text style={styles.principleTitle}>Samacheer-Based Learning</Text>
+              <Text style={styles.principleText}>
+                Questions in TNPSC exams are derived from Samacheer (Tamil Nadu State Board) textbooks from 6th to 12th standard. 
+                We strictly follow this curriculum, ensuring you study only what's necessary. No out-of-syllabus content, 
+                no expensive reference books. If it's not in Samacheer, it's not in our notes.
+              </Text>
+            </View>
+
             <View style={{ height: 120 }} />
           </ScrollView>
         </View>
@@ -1198,10 +1243,16 @@ export default function App() {
         </View>
       </Modal>
 
-        {selectedExam !== null && prepLevel !== null && (prepLevel !== 'intermediate' || isIntermediateSetupDone) && page !== 'guest' && page !== 'strategy' && (
+        {selectedExam !== null && prepLevel !== null && (prepLevel !== 'intermediate' || isIntermediateSetupDone) && page !== 'guest' && (
   <View style={styles.navBar}>
     <Pressable onPress={() => setPage('home')} style={({pressed}) => [styles.navItem, page === 'home' && styles.navItemActive, pressed && styles.buttonPressed]}>
       <Text style={[styles.navText, page === 'home' ? styles.navTextActive : styles.navTextInactive]}>Home</Text>
+    </Pressable>
+    <Pressable onPress={() => setPage('progress')} style={({pressed}) => [styles.navItem, page === 'progress' && styles.navItemActive, pressed && styles.buttonPressed]}>
+      <Text style={[styles.navText, page === 'progress' ? styles.navTextActive : styles.navTextInactive]}>Syllabus</Text>
+    </Pressable>
+    <Pressable onPress={() => setPage('principles')} style={({pressed}) => [styles.navItem, page === 'principles' && styles.navItemActive, pressed && styles.buttonPressed]}>
+      <Text style={[styles.navText, page === 'principles' ? styles.navTextActive : styles.navTextInactive]}>Principles</Text>
     </Pressable>
     <Pressable onPress={() => setPage('resources')} style={({pressed}) => [styles.navItem, page === 'resources' && styles.navItemActive, pressed && styles.buttonPressed]}>
       <Text style={[styles.navText, page === 'resources' ? styles.navTextActive : styles.navTextInactive]}>Exam Info</Text>
@@ -1218,10 +1269,10 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#1a3a12' },
-  page: { flex: 1, paddingHorizontal: 22, paddingTop: 16, backgroundColor: '#1a3a12' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a3a12' },
-  loadingText: { color: '#f4d72d', fontSize: 18, fontWeight: '800' },
+  safeArea: { flex: 1, backgroundColor: '#fef9e7' },
+  page: { flex: 1, paddingHorizontal: 22, paddingTop: 16, backgroundColor: '#fef9e7' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fef9e7' },
+  loadingText: { color: '#2f5e1f', fontSize: 18, fontWeight: '800' },
 
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, zIndex: 10 },
   topBarSpacer: { width: 40 },
@@ -1241,18 +1292,18 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  title: { color: '#1a3a12', fontSize: 52, fontWeight: '900', letterSpacing: -1 },
+  title: { color: '#2f5e1f', fontSize: 52, fontWeight: '900', letterSpacing: -1 },
   logoImage: { width: 180, height: 180, marginBottom: 0 },
   statusBoard: { marginTop: 20, width: '100%', alignItems: 'center' },
-  examBadgeLarge: { backgroundColor: 'rgba(26, 58, 18, 0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#d4af37' },
-  examBadgeTextLarge: { color: '#1a3a12', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  examBadgeLarge: { backgroundColor: 'rgba(47, 94, 31, 0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#d4af37' },
+  examBadgeTextLarge: { color: '#2f5e1f', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   countdownContainer: { alignItems: 'center' },
-  countdownValue: { color: '#1a3a12', fontSize: 72, fontWeight: '900', lineHeight: 72 },
+  countdownValue: { color: '#2f5e1f', fontSize: 72, fontWeight: '900', lineHeight: 72 },
   countdownLabel: { color: '#8b7355', fontSize: 12, fontWeight: '800', letterSpacing: 4, marginTop: -4 },
-  homeProgressBox: { width: '100%', marginTop: 20, backgroundColor: '#1a3a12', borderRadius: 20, padding: 16, borderWidth: 2, borderColor: '#d4af37' },
+  homeProgressBox: { width: '100%', marginTop: 20, backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 2, borderColor: '#d4af37' },
   homeProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  homeProgressTitle: { color: '#f4d72d', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
-  homeProgressValue: { color: '#f4d72d', fontSize: 20, fontWeight: '900' },
+  homeProgressTitle: { color: '#2f5e1f', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  homeProgressValue: { color: '#2f5e1f', fontSize: 20, fontWeight: '900' },
   homeProgressBar: { height: 10, backgroundColor: 'rgba(244, 215, 45, 0.2)', borderRadius: 5, overflow: 'hidden' },
   homeDashboardRow: {
     flexDirection: 'row',
@@ -1265,28 +1316,28 @@ const styles = StyleSheet.create({
   },
   homeDashboardItem: { alignItems: 'flex-start' },
   homeDashboardItemRight: { alignItems: 'flex-end' },
-  homeDashboardLabel: { color: '#8b7355', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 2 },
-  homeDashboardValue: { color: '#f4d72d', fontSize: 16, fontWeight: '900' },
-  homeDashboardValueTarget: { color: '#eb7828', fontSize: 16, fontWeight: '900' },
+  homeDashboardLabel: { color: '#6e9e5a', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 2 },
+  homeDashboardValue: { color: '#2f5e1f', fontSize: 16, fontWeight: '900' },
+  homeDashboardValueTarget: { color: '#59a13f', fontSize: 16, fontWeight: '900' },
   homeProgressFill: { height: '100%', backgroundColor: '#d4af37' },
   heroFooter: { marginTop: 12 },
   eyebrow: { color: '#8b7355', fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  activeExamHeader: { backgroundColor: '#f4d72d', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderColor: '#d4af37' },
-  activeExamHeaderText: { color: '#1a3a12', fontSize: 14, fontWeight: '800' },
+  activeExamHeader: { backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderColor: '#d4af37' },
+  activeExamHeaderText: { color: '#2f5e1f', fontSize: 14, fontWeight: '800' },
   switchIcon: { width: 0, height: 0, borderTopWidth: 5, borderLeftWidth: 5, borderRightWidth: 5, borderTopColor: '#d4af37', borderLeftColor: 'transparent', borderRightColor: 'transparent' },
-  guestBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f4d72d', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 2, borderColor: '#d4af37' },
-  guestBadgeText: { color: '#1a3a12', fontSize: 14, fontWeight: '800' },
-  backButton: { backgroundColor: '#f4d72d', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 2, borderColor: '#d4af37' },
-  backButtonText: { color: '#1a3a12', fontSize: 14, fontWeight: '800' },
-  infoCard: { marginTop: 20, backgroundColor: '#f4d72d', borderRadius: 30, padding: 24, borderWidth: 3, borderColor: '#d4af37' },
-  infoTitle: { color: '#1a3a12', fontSize: 30, fontWeight: '800', marginBottom: 16 },
-  infoText: { color: '#1a3a12', fontSize: 16, lineHeight: 24, marginBottom: 12 },
+  guestBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 2, borderColor: '#d4af37' },
+  guestBadgeText: { color: '#2f5e1f', fontSize: 14, fontWeight: '800' },
+  backButton: { backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 2, borderColor: '#d4af37' },
+  backButtonText: { color: '#2f5e1f', fontSize: 14, fontWeight: '800' },
+  infoCard: { marginTop: 20, backgroundColor: '#fff', borderRadius: 30, padding: 24, borderWidth: 3, borderColor: '#d4af37' },
+  infoTitle: { color: '#2f5e1f', fontSize: 30, fontWeight: '800', marginBottom: 16 },
+  infoText: { color: '#444', fontSize: 16, lineHeight: 24, marginBottom: 12 },
   onboardingContainer: { flex: 1, justifyContent: 'center' },
-  onboardingEyebrow: { color: '#d4af37', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', textAlign: 'center', marginBottom: 8 },
-  onboardingTitle: { color: '#f4d72d', fontSize: 32, fontWeight: '900', textAlign: 'center', marginBottom: 12 },
-  onboardingText: { color: '#f4d72d', fontSize: 16, textAlign: 'center', marginBottom: 30 },
+  onboardingEyebrow: { color: '#59a13f', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', textAlign: 'center', marginBottom: 8 },
+  onboardingTitle: { color: '#2f5e1f', fontSize: 32, fontWeight: '900', textAlign: 'center', marginBottom: 12 },
+  onboardingText: { color: '#444', fontSize: 16, textAlign: 'center', marginBottom: 30 },
   examOption: {
-    backgroundColor: '#f4d72d',
+    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 14,
@@ -1299,17 +1350,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   examOptionSelected: {
-    borderColor: '#fff',
-    backgroundColor: '#ffe54e',
+    borderColor: '#59a13f',
+    backgroundColor: '#fef9e7',
   },
   examOptionLabel: {
-    color: '#1a3a12',
+    color: '#2f5e1f',
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
   },
   levelOption: {
-    backgroundColor: '#f4d72d',
+    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 14,
@@ -1322,19 +1373,19 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   levelOptionTitle: {
-    color: '#1a3a12',
+    color: '#2f5e1f',
     fontSize: 18,
     fontWeight: '900',
     marginBottom: 4,
   },
   levelOptionDesc: {
-    color: '#2f5e1f',
+    color: '#6e9e5a',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
   },
   modalButtonSecondary: {
-    backgroundColor: '#f4d72d',
+    backgroundColor: '#fff',
     borderRadius: 999,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -1344,50 +1395,69 @@ const styles = StyleSheet.create({
     borderColor: '#d4af37',
   },
   modalButtonSecondaryText: {
-    color: '#1a3a12',
+    color: '#2f5e1f',
     fontSize: 14,
     fontWeight: '800',
   },
   quoteWrapper: {
     marginTop: 28,
-    backgroundColor: 'rgba(235, 120, 40, 0.1)',
+    backgroundColor: 'rgba(47, 94, 31, 0.08)',
     borderRadius: 20,
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderWidth: 1.5,
-    borderColor: 'rgba(235, 120, 40, 0.3)',
+    borderColor: 'rgba(47, 94, 31, 0.2)',
     borderStyle: 'dashed',
     alignItems: 'center',
   },
   quoteText: {
-    color: '#eb7828',
+    color: '#59a13f',
     fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
     lineHeight: 22,
   },
-  onboardingTitleSmall: { color: '#f4d72d', fontSize: 22, fontWeight: '800', marginBottom: 6 },
-  onboardingTextSmall: { color: '#f4d72d', fontSize: 14, marginBottom: 20 },
-  strategyUnit: { backgroundColor: 'rgba(26, 58, 18, 0.7)', borderRadius: 20, padding: 22, marginBottom: 16, borderWidth: 2, borderColor: '#d4af37' },
-  strategyUnitTitle: { color: '#f4d72d', fontSize: 18, fontWeight: '700' },
-  strategyUnitMarks: { color: '#d4af37', fontSize: 14, fontWeight: '800', marginTop: 4 },
-  subTabContainer: { flexDirection: 'row', backgroundColor: 'rgba(212, 175, 55, 0.1)', borderRadius: 12, padding: 4, marginBottom: 10 },
+  onboardingTitleSmall: { color: '#2f5e1f', fontSize: 22, fontWeight: '800', marginBottom: 6 },
+  onboardingTextSmall: { color: '#444', fontSize: 14, marginBottom: 20 },
+  setupUnit: { backgroundColor: '#fff', borderRadius: 20, padding: 22, marginBottom: 16, borderWidth: 2, borderColor: '#d4af37' },
+  setupTopicsPanel: { backgroundColor: '#fef9e7', borderRadius: 16, padding: 16, marginTop: 12 },
+  setupUnitHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  setupCheckbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#d4af37', marginRight: 12, alignItems: 'center', justifyContent: 'center' },
+  setupCheckboxActive: { backgroundColor: '#d4af37', borderColor: '#d4af37' },
+  setupCheckboxInner: { width: 12, height: 12, borderRadius: 3, backgroundColor: '#fff' },
+  setupUnitTitle: { color: '#2f5e1f', fontSize: 16, fontWeight: '800', flex: 1 },
+  textSeparator: { height: 1, backgroundColor: 'rgba(212, 175, 55, 0.3)', marginVertical: 8 },
+  setupTopicRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 },
+  setupCheckboxMini: { width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: '#d4af37', marginRight: 10, alignItems: 'center', justifyContent: 'center' },
+  setupCheckboxInnerMini: { width: 10, height: 10, borderRadius: 2, backgroundColor: '#fff' },
+  setupTopicText: { color: '#444', fontSize: 14, flex: 1 },
+  setupTopicTextCompleted: { textDecorationLine: 'line-through', color: '#999' },
+  strategyUnit: { backgroundColor: '#fff', borderRadius: 20, padding: 22, marginBottom: 16, borderWidth: 2, borderColor: '#d4af37' },
+  strategyUnitTitle: { color: '#2f5e1f', fontSize: 18, fontWeight: '700' },
+  strategyUnitMarks: { color: '#59a13f', fontSize: 14, fontWeight: '800', marginTop: 4 },
+  subTabContainer: { flexDirection: 'row', backgroundColor: 'rgba(212, 175, 55, 0.15)', borderRadius: 12, padding: 4, marginBottom: 10 },
   subTab: { flex: 1, paddingVertical: 8, alignItems: 'center' },
   activeSubTab: { backgroundColor: '#d4af37' },
-  subTabText: { color: '#f4d72d', fontSize: 13, fontWeight: '700' },
-  activeSubTabText: { color: '#1a3a12' },
+  subTabText: { color: '#2f5e1f', fontSize: 13, fontWeight: '700' },
+  activeSubTabText: { color: '#fff' },
   resourcesHeader: { marginTop: 10, alignItems: 'center' },
-  resourcesTitle: { color: '#f4d72d', fontSize: 28, fontWeight: '800' },
+  resourcesTitle: { color: '#2f5e1f', fontSize: 28, fontWeight: '800' },
   tabContainer: { flexDirection: 'row', gap: 10, marginTop: 16 },
   tab: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
   activeTab: { backgroundColor: '#59a13f' },
   tabText: { color: '#6e9e5a', fontSize: 13, fontWeight: '700' },
   activeTabText: { color: '#fff' },
   resourceContent: { flex: 1, marginTop: 20 },
-  sectionTitle: { color: '#f4d72d', fontSize: 18, fontWeight: '800', marginTop: 22, marginBottom: 12 },
+  sectionTitle: { color: '#2f5e1f', fontSize: 18, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   collapsibleCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
   collapsibleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  collapsibleTitle: { color: '#333', fontSize: 15, fontWeight: '700' },
+  collapsibleTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  collapsibleTitle: { color: '#333', fontSize: 15, fontWeight: '700', flex: 1 },
+  weightageBadge: { backgroundColor: '#d4af37', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginLeft: 8 },
+  weightageText: { color: '#2f5e1f', fontSize: 12, fontWeight: '800' },
+  collapsibleMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  collapsibleProgress: { color: '#666', fontSize: 12, fontWeight: '600' },
+  collapsiblePercent: { color: '#59a13f', fontSize: 12, fontWeight: '800' },
   collapsibleMarks: { color: '#59a13f', fontSize: 11, fontWeight: '800' },
   arrow: { width: 8, height: 8, borderRightWidth: 2, borderBottomWidth: 2, borderColor: '#59a13f', transform: [{ rotate: '45deg' }] },
   arrowExpanded: { transform: [{ rotate: '-135deg' }] },
@@ -1405,67 +1475,67 @@ const styles = StyleSheet.create({
   aboutText: { color: '#444', fontSize: 15, fontWeight: '600', lineHeight: 24 },
   infoTextSmall: { color: '#f4d72d', fontSize: 14, fontWeight: '600', lineHeight: 22, marginBottom: 10 },
   textBold: { fontWeight: '700' },
-  testCard: { backgroundColor: '#f4d72d', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 3, borderColor: '#d4af37' },
+  testCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 3, borderColor: '#d4af37' },
   testTitle: { color: '#2f5e1f', fontSize: 18, fontWeight: '800' },
   testMeta: { color: '#6e9e5a', fontSize: 14, marginBottom: 16 },
-  startTestButton: { backgroundColor: '#59a13f', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  startTestButtonText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  startTestButton: { backgroundColor: '#d4af37', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  startTestButtonText: { color: '#2f5e1f', fontSize: 14, fontWeight: '800' },
   comingSoonBox: { padding: 30, alignItems: 'center' },
   comingSoonText: { color: '#999', fontSize: 14 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(26, 58, 18, 0.85)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 32, padding: 28, borderWidth: 2, borderColor: 'rgba(89, 161, 63, 0.2)' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(47, 94, 31, 0.75)', justifyContent: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 32, padding: 28, borderWidth: 2, borderColor: 'rgba(212, 175, 55, 0.3)' },
   modalHeader: { alignItems: 'center', marginBottom: 12 },
-  modalTitle: { color: '#1a3a12', fontSize: 24, fontWeight: '900', marginBottom: 8 },
-  wisdomCard: { backgroundColor: 'rgba(235, 120, 40, 0.05)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(235, 120, 40, 0.15)', borderStyle: 'dashed' },
-  wisdomText: { color: '#eb7828', fontSize: 16, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
-  switchTitle: { color: '#6e9e5a', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1 },
+  modalTitle: { color: '#2f5e1f', fontSize: 24, fontWeight: '900', marginBottom: 8 },
+  wisdomCard: { backgroundColor: 'rgba(47, 94, 31, 0.05)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(47, 94, 31, 0.15)', borderStyle: 'dashed' },
+  wisdomText: { color: '#59a13f', fontSize: 16, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
+  switchTitle: { color: '#59a13f', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1 },
   examOptionModal: { backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
   examOptionLabelSmall: { color: '#2f5e1f', fontSize: 16, fontWeight: '800' },
   examOptionSelectedOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(89, 161, 63, 0.08)', borderRadius: 16 },
-  modalButtonPrimary: { backgroundColor: '#59a13f', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
+  modalButtonPrimary: { backgroundColor: '#d4af37', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
   aboutManifestoCard: { backgroundColor: '#fef9e7', borderRadius: 24, padding: 24, marginBottom: 16, borderWidth: 2, borderColor: '#e8cc5a' },
   modalBackButton: { marginBottom: 16 },
-  modalBackButtonText: { color: '#59a13f', fontSize: 14, fontWeight: '700' },
-  textSeparator: { height: 1, backgroundColor: 'rgba(66, 104, 52, 0.15)', marginVertical: 12 },
+  modalBackButtonText: { color: '#2f5e1f', fontSize: 14, fontWeight: '700' },
+  textSeparator: { height: 1, backgroundColor: 'rgba(212, 175, 55, 0.3)', marginVertical: 12 },
   plannerCard: { backgroundColor: '#fef9e7', borderRadius: 24, padding: 24, marginBottom: 16, borderWidth: 2, borderColor: '#e8cc5a' },
   plannerBadge: { backgroundColor: 'rgba(235, 120, 40, 0.1)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 12 },
   plannerBadgeText: { color: '#eb7828', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  plannerName: { color: '#1a3a12', fontSize: 20, fontWeight: '800', marginBottom: 20 },
+  plannerName: { color: '#2f5e1f', fontSize: 20, fontWeight: '800', marginBottom: 20 },
   plannerDates: { flexDirection: 'row', justifyContent: 'space-between' },
   dateBlock: { flex: 1 },
   dateLabel: { color: '#8b7355', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
   dateValue: { color: '#2f5e1f', fontSize: 16, fontWeight: '900' },
   strategyContainer: { flex: 1 },
   strategyHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  infoEyebrow: { color: '#d4af37', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  strategyTitle: { color: '#f4d72d', fontSize: 28, fontWeight: '900', marginTop: 2 },
-  strategyToggleBtn: { backgroundColor: '#f4d72d', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 2, borderColor: '#d4af37' },
-  strategyToggleBtnText: { color: '#1a3a12', fontSize: 13, fontWeight: '800' },
+  infoEyebrow: { color: '#59a13f', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  strategyTitle: { color: '#2f5e1f', fontSize: 28, fontWeight: '900', marginTop: 2 },
+  strategyToggleBtn: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 2, borderColor: '#d4af37' },
+  strategyToggleBtnText: { color: '#2f5e1f', fontSize: 13, fontWeight: '800' },
   attackPlanContainer: { flex: 1 },
-  attackStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#fef9e7', padding: 16, borderRadius: 20, borderWidth: 2, borderColor: '#e8cc5a' },
+  attackStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#fff', padding: 16, borderRadius: 20, borderWidth: 2, borderColor: '#d4af37' },
   attackStatItem: { alignItems: 'center', flex: 1 },
-  attackStatLabel: { color: '#5a4a1a', fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 4 },
-  attackStatValue: { color: '#1a3a12', fontSize: 22, fontWeight: '900' },
-  attackAdviceBox: { backgroundColor: '#fef9e7', padding: 18, borderRadius: 20, marginBottom: 16, borderWidth: 2, borderColor: '#e8cc5a' },
-  attackAdviceTitle: { color: '#1a3a12', fontSize: 16, fontWeight: '900', marginBottom: 6 },
-  attackAdviceText: { color: '#4a4a2a', fontSize: 14, lineHeight: 22, fontWeight: '600' },
-  attackUnitItem: { backgroundColor: '#fef9e7', padding: 18, borderRadius: 20, marginBottom: 12, borderWidth: 2, borderColor: '#e8cc5a' },
-  attackUnitTitle: { color: '#1a3a12', fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  attackUnitWeight: { color: '#2f5e1f', fontSize: 14, fontWeight: '800', marginTop: 4 },
+  attackStatLabel: { color: '#6e9e5a', fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 4 },
+  attackStatValue: { color: '#2f5e1f', fontSize: 22, fontWeight: '900' },
+  attackAdviceBox: { backgroundColor: 'rgba(47, 94, 31, 0.05)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(47, 94, 31, 0.15)', borderStyle: 'dashed' },
+  attackAdviceTitle: { color: '#59a13f', fontSize: 16, fontWeight: '900', marginBottom: 6 },
+  attackAdviceText: { color: '#59a13f', fontSize: 16, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
+  attackUnitItem: { backgroundColor: '#fff', padding: 18, borderRadius: 20, marginBottom: 12, borderWidth: 2, borderColor: '#d4af37' },
+  attackUnitTitle: { color: '#2f5e1f', fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  attackUnitWeight: { color: '#59a13f', fontSize: 14, fontWeight: '800', marginTop: 4 },
   attackActionRow: { marginTop: 6 },
-  attackActionHint: { color: '#eb7828', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-  strategySubtext: { color: '#f4d72d', fontSize: 14, fontWeight: '600', marginBottom: 12 },
-  strategyUnit: { backgroundColor: '#fef9e7', borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 2, borderColor: '#e8cc5a' },
-  strategyUnitTitle: { color: '#1a3a12', fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  strategyUnitMarks: { color: '#2f5e1f', fontSize: 14, fontWeight: '800', marginTop: 4 },
-  targetMarksBoxFixed: { backgroundColor: '#fef9e7', borderRadius: 20, padding: 18, alignItems: 'center', marginTop: 12, borderWidth: 2, borderColor: '#e8cc5a' },
-  targetMarksTitleLarge: { color: '#1a3a12', fontSize: 18, fontWeight: '900' },
-  targetMarksRed: { color: '#eb7828', fontWeight: '900' },
-  targetMarksSub: { color: '#2f5e1f', fontSize: 13, fontWeight: '600', marginTop: 4, textAlign: 'center' },
-  phase2Note: { color: '#f4d72d', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 14, fontStyle: 'italic' },
-  setupFooterFixed: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 22, backgroundColor: '#f4d72d', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
-  setupBtn: { backgroundColor: '#59a13f', paddingVertical: 18, borderRadius: 24, alignItems: 'center' },
-  setupBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  attackActionHint: { color: '#d4af37', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
+  strategySubtext: { color: '#2f5e1f', fontSize: 14, fontWeight: '600', marginBottom: 12 },
+  strategyUnit: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 2, borderColor: '#d4af37' },
+  strategyUnitTitle: { color: '#2f5e1f', fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  strategyUnitMarks: { color: '#59a13f', fontSize: 14, fontWeight: '800', marginTop: 4 },
+  targetMarksBoxFixed: { backgroundColor: 'rgba(47, 94, 31, 0.05)', borderRadius: 24, padding: 18, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(47, 94, 31, 0.15)', borderStyle: 'dashed' },
+  targetMarksTitleLarge: { color: '#59a13f', fontSize: 18, fontWeight: '900' },
+  targetMarksRed: { color: '#59a13f', fontWeight: '900' },
+  targetMarksSub: { color: '#6e9e5a', fontSize: 13, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  phase2Note: { color: '#6e9e5a', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 14, fontStyle: 'italic' },
+  setupFooterFixed: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 22, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  setupBtn: { backgroundColor: '#d4af37', paddingVertical: 18, borderRadius: 24, alignItems: 'center' },
+  setupBtnText: { color: '#2f5e1f', fontSize: 16, fontWeight: '800' },
   lockIcon: { fontSize: 40, marginBottom: 12 },
   lockedTestCard: { backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 24, padding: 40, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(0,0,0,0.1)' },
   lockedTitle: { color: '#1a3a12', fontSize: 18, fontWeight: '900', marginBottom: 8 },
@@ -1474,37 +1544,34 @@ const styles = StyleSheet.create({
   mainActionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '900', letterSpacing: 2, marginBottom: 4 },
   mainActionTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
   homeStrategyLink: {
+    width: '100%',
     marginTop: 14,
-    backgroundColor: 'rgba(26, 58, 18, 0.55)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 215, 45, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#d4af37',
   },
   homeStrategyLinkLabel: {
-    color: 'rgba(244, 215, 45, 0.7)',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    marginBottom: 3,
+    color: '#2f5e1f',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   homeStrategyLinkTitle: {
-    color: '#f4d72d',
-    fontSize: 15,
-    fontWeight: '800',
+    color: '#2f5e1f',
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 4,
   },
   navBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     flexDirection: 'row',
-    backgroundColor: '#1a3a12',
+    backgroundColor: '#fff',
     paddingVertical: 14,
     paddingBottom: Platform.OS === 'ios' ? 28 : 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(244, 215, 45, 0.15)',
+    borderTopColor: 'rgba(212, 175, 55, 0.3)',
     justifyContent: 'space-around',
     zIndex: 100,
     borderTopLeftRadius: 28,
@@ -1516,13 +1583,84 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   navItem: { paddingHorizontal: 24, paddingVertical: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  navItemActive: { backgroundColor: 'rgba(244, 215, 45, 0.12)' },
+  navItemActive: { backgroundColor: 'rgba(47, 94, 31, 0.1)' },
   navText: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
-  navTextActive: { color: '#f4d72d', fontWeight: '900' },
-  navTextInactive: { color: 'rgba(244, 215, 45, 0.45)' },
+  navTextActive: { color: '#2f5e1f', fontWeight: '900' },
+  navTextInactive: { color: 'rgba(47, 94, 31, 0.5)' },
   buttonPressed: { opacity: 0.6 },
   clearButton: { marginTop: 20, backgroundColor: 'rgba(235, 70, 70, 0.1)', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   clearButtonText: { color: '#a32a2a', fontSize: 14, fontWeight: '800' },
+
+  // PHILOSOPHY BOX
+  philosophyBox: {
+    backgroundColor: 'rgba(47, 94, 31, 0.05)',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(47, 94, 31, 0.15)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  philosophyText: {
+    color: '#59a13f',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    lineHeight: 26,
+  },
+
+  // PRINCIPLES PAGE STYLES
+  principlesHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  principlesTitle: {
+    color: '#2f5e1f',
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  principlesSubtitle: {
+    color: '#6e9e5a',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  principleCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#d4af37',
+  },
+  principleNumber: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#d4af37',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  principleNumberText: {
+    color: '#2f5e1f',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  principleTitle: {
+    color: '#2f5e1f',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  principleText: {
+    color: '#444',
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
 
   // ELIGIBILITY & VACANCY STYLES
   eligibilitySection: { marginTop: 24, backgroundColor: 'rgba(244, 215, 45, 0.12)', borderRadius: 24, padding: 20, borderWidth: 2, borderColor: '#d4af37' },
@@ -2070,7 +2208,7 @@ const styles = StyleSheet.create({
     borderColor: '#e8cc5a',
   },
   progressPageTitle: {
-    color: '#1a3a12',
+    color: '#2f5e1f',
     fontSize: 24,
     fontWeight: '900',
     marginBottom: 8,
@@ -2092,7 +2230,7 @@ const styles = StyleSheet.create({
     borderColor: '#d4af37',
   },
   progressStatText: {
-    color: '#1a3a12',
+    color: '#2f5e1f',
     fontSize: 16,
     fontWeight: '800',
   },
